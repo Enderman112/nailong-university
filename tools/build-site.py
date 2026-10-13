@@ -43,7 +43,14 @@ def fill_all(text, cfg):
     return fill(str(text).replace("{school_del}", school_with_del(cfg)), cfg)
 
 
-def context(cfg):
+# 版式 -> (模板文件, 不当首页时叫什么)。首页永远叫 index.html。
+LAYOUTS = {
+    "index": ("index.html.tmpl", "rotate.html"),    # 旋转校徽环那种
+    "mascot": ("mascot.html.tmpl", "mascot.html"),  # 校徽旁边一只奶龙那种
+}
+
+
+def context(cfg, canonical_self):
     p = punycode(cfg["domain"])
     school, site = cfg["school_name_cn"], cfg["site_title"]
     motto = cfg.get("school_motto", "")
@@ -51,7 +58,7 @@ def context(cfg):
         "site_title": site,
         "site_title_en": cfg.get("site_title_en") or cfg["school_name_en"],
         "target_url": cfg["target_url"],
-        "canonical": f"https://{p}/",
+        "canonical_self": canonical_self,
         "og_image": f"https://{p}/og.jpg",
         "description": f"奶龙正在护送你前往{site}，随后自动前往{school}官网。",
         "og_description": f"奶龙正在护送你前往{site}",
@@ -82,6 +89,11 @@ def self_check(cfg):
     """
     print("\n  将要生成的站点 —— 请逐项确认是用户要的，不是本仓库的示例：")
     print("    （首页顶着的那个大标题 = 恶搞名；文案里说「送到 XX 官网」的 = 正式名）")
+    _home = cfg.get("homepage", "index")
+    print(f"    {'首页版式':<12} homepage={_home}"
+          f"   →  index.html 用「{'旋转校徽环' if _home == 'index' else '校徽+奶龙'}」那套")
+    if _home not in LAYOUTS:
+        print(f"    ⚠️ homepage 只能是 {' / '.join(LAYOUTS)}")
     for label, key in (("恶搞学校名", "site_title"),
                        ("正式学校名", "school_name_cn"),
                        ("学校英文名", "school_name_en"),
@@ -128,17 +140,31 @@ def render(text, ctx):
 
 
 def build_pages(cfg):
-    ctx = context(cfg)
+    home = cfg.get("homepage", "index")
+    if home not in LAYOUTS:
+        raise SystemExit(f'config.json 的 homepage 只能是 {" / ".join(LAYOUTS)}，现在是 {home!r}')
     out = site_dir(cfg)
     os.makedirs(out, exist_ok=True)
-    for tmpl, name in (("index.html.tmpl", "index.html"), ("mascot.html.tmpl", "mascot.html")):
-        src = os.path.join(ROOT, "templates", tmpl)
-        with open(src, encoding="utf-8") as fh:
-            html = render(fh.read(), ctx)
+    p = punycode(cfg["domain"])
+    written = set()
+    for key, (tmpl, alt_name) in LAYOUTS.items():
+        name = "index.html" if key == home else alt_name
+        written.add(name)
+        canonical = f"https://{p}/" if key == home else f"https://{p}/{name}"
+        with open(os.path.join(ROOT, "templates", tmpl), encoding="utf-8") as fh:
+            html = render(fh.read(), context(cfg, canonical))
         with open(os.path.join(out, name), "w", encoding="utf-8") as fh:
             fh.write(html)
-        print(f"  {name}  ← templates/{tmpl}")
-    print(f"  域名 {cfg['domain']} → punycode {punycode(cfg['domain'])}")
+        print(f"  {name:<14} ← templates/{tmpl}{'   （首页）' if key == home else ''}")
+    # 换过首页的话，上一次生成的另一个文件名会留在目录里，变成重复页面，清掉。
+    # 只删「本生成器可能产出过的名字」，不动用户自己加的文件。
+    possible = {"index.html"} | {alt for _, alt in LAYOUTS.values()}
+    for stale in sorted(possible - written):
+        f = os.path.join(out, stale)
+        if os.path.exists(f):
+            os.remove(f)
+            print(f"  清掉上一次遗留的 {stale}（换首页后它已经不该存在了）")
+    print(f"  首页版式 homepage={home}   域名 {cfg['domain']} → {p}")
 
 
 def main():

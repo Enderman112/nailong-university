@@ -125,7 +125,8 @@ grep -oE '<title>[^<]*</title>' /tmp/school.html
 
 | 字段 | 说明 |
 | --- | --- |
-| `site_title` | 「中国奶龙大学」这种 |
+| `homepage` | 哪套版式当首页：`index`（旋转校徽环，默认）或 `mascot`（校徽旁一只奶龙）。另一个会生成到 `/mascot.html` 或 `/rotate.html` |
+| `site_title` | 「中国奶龙大学」这种（**恶搞名**） |
 | `school_name_cn` / `school_name_en` / `school_motto` / `school_founded` | 真实学校信息 |
 | `target_url` | 页面最后跳哪（**记得带结尾斜杠**，和学校官网一致） |
 | `domain` | 中文域名直接写中文，脚本自己转 punycode |

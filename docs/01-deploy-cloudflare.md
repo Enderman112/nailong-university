@@ -277,16 +277,26 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$P/ring.webp"    # 期望 200，不�
 
 三条都过，说明层级没问题，可以继续绑域名了。
 
-### 备选版式放在哪
+### 两套版式谁当首页：改配置，别手动改名
 
-`mascot.html` 部署后在 `https://<域名>/mascot.html`，主页面 `index.html` 在 `/`。
-**想反过来让备选版式当首页**，就在 `site/` 里把两个文件对调：
+| `config.json` 的 `homepage` | `/` 显示 | 另一个在 |
+| --- | --- | --- |
+| `"index"`（默认） | 旋转校徽环 + 倒计时（仿 中国奶龙大学.com） | `/mascot.html` |
+| `"mascot"` | 校徽旁边一只奶龙 + 进度条（仿 哈尔滨奶龙大学.com） | `/rotate.html` |
 
-```bash
-cd site && mv index.html home-rotate.html && mv mascot.html index.html
+```json
+"homepage": "mascot"
 ```
 
-（更好的做法是改 `tools/build-site.py` 里的输出映射，免得下次生成又被覆盖。）
+然后重新生成：
+
+```bash
+python3 tools/build-site.py
+```
+
+**为什么不要手动 `mv`**：`site/*.html` 是 `templates/` + `config.json` 生成的，
+你手改完下次一跑生成器就没了。生成器还会自动把「换首页后遗留的旧文件」删掉，
+免得线上多一个重复页面。
 
 ### 没有 Pages 的替代方案
 

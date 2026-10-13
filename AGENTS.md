@@ -16,7 +16,7 @@
 | 「给 XX 学校也整一个」「换成我们学校」 | **`docs/02-design-workflow.md`** | 先按第 0 节的清单**问用户**，填 `config.json`，跑 `tools/build-site.py` |
 | 「部署上去」「怎么上线」「拆掉那个 301」 | **`docs/01-deploy-cloudflare.md`** | 判断有没有 API Token，选 MODE A（指导）或 MODE B（你用 API 直接做） |
 | 「为什么是这么设计的」「参考站长什么样」 | **`docs/03-reference-notes.md`** | 逆向记录，几何参数都在这 |
-| 「我要换个跳转目标 / 改文案」 | 改 `config.json`，跑 `tools/build-site.py --no-assets` | 不用碰 Cloudflare |
+| 「我要换个跳转目标 / 改文案 / 换哪套版式当首页」 | 改 `config.json`（`target_url` / 文案 / `homepage`），跑 `tools/build-site.py --no-assets` | 不用碰 Cloudflare |
 
 ## 硬性约束（别违反）
 
