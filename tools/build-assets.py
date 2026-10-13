@@ -50,8 +50,20 @@ DEFAULTS = {
     "core_fade_from": 0.80,
 }
 
-FONT_CN = "/System/Library/Fonts/Hiragino Sans GB.ttc"
-FONT_LATIN = "/System/Library/Fonts/HelveticaNeue.ttc"
+# 字体候选清单（按顺序找第一个能用的）。原来只写死 macOS 路径，
+# 在 Windows / Linux 上 og.jpg 的中文就变成豆腐块（docs/02 第 7 节那个坑）。
+FONT_CN = (
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",          # macOS
+    "/System/Library/Fonts/PingFang.ttc",                  # macOS
+    "C:/Windows/Fonts/msyh.ttc",                           # Windows 微软雅黑
+    "C:/Windows/Fonts/simhei.ttf",                         # Windows 黑体
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",   # Linux
+)
+FONT_LATIN = (
+    "/System/Library/Fonts/HelveticaNeue.ttc",
+    "C:/Windows/Fonts/arial.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+)
 
 
 # --------------------------------------------------------------------------- 配置
@@ -119,11 +131,20 @@ def src_path(cfg, key):
     return p if os.path.isabs(p) else os.path.join(cfg["_root"], p)
 
 
-def _font(path, size, index=0):
-    try:
-        return ImageFont.truetype(path, size, index=index)
-    except Exception:
-        return ImageFont.load_default(size)
+def _font(paths, size, index=0):
+    """按候选清单挑第一个装得上的字体；都没有再退回 Pillow 自带的位图字体。
+
+    index 是 .ttc 里第几个字面（macOS 上 y 用 1）；该 index 不存在时退回 0。
+    """
+    if isinstance(paths, str):
+        paths = (paths,)
+    for path in paths:
+        for idx in ([index, 0] if index else [0]):
+            try:
+                return ImageFont.truetype(path, size, index=idx)
+            except Exception:
+                continue
+    return ImageFont.load_default(size)
 
 
 # --------------------------------------------------------------------------- 1. 校徽外环
