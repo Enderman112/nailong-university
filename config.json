@@ -1,0 +1,64 @@
+{
+  // ─────────────────────────────────────────────────────────────────────────
+  // 一个学校的全部可配项。换学校 = 改这个文件 + 换两张原图，然后跑：
+  //     python3 tools/build-site.py
+  // 每一项的含义和「不知道时怎么查」见 docs/02-design-workflow.md
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // 这是哪个「奶龙大学」——显示在页面大标题和浏览器标签上
+  "site_title": "中国奶龙大学",
+
+  // 真实学校信息。school_name_cn 用于「把你送到 XX 官网」这类文案，
+  // 请以学校官网当前的名字为准（有的学校刚更名，校徽和站名可能不一致）
+  "school_name_cn": "湖州师范大学",
+  "school_name_en": "Huzhou Normal University",
+  "school_motto": "明体达用",
+  "school_founded": "1916",
+
+  // 页面最后把用户送去哪
+  "target_url": "https://www.huznu.edu.cn/",
+
+  // 域名：中文域名填中文即可，脚本自己转 punycode
+  "domain": "中国奶龙大学.org",
+
+  // 备选版式（mascot.html）里显示的那行大字，随便起，一般是拼音/英文
+  "site_title_en": "China Nailong University",
+
+  // 文案。{school} 会被替换成 school_name_cn，{site} 替换成 site_title，{domain} 替换成 domain
+  "intro_line": "奶龙正在护送你前往",
+  "og_subtitle": ["奶龙正在护送你前往", "{school}官网"],
+  // {school_del} = 学校名中间插一个划掉的字，由下面两个字段拼出来
+  "about_p1": "本站为奶龙站点：打开 {domain}，会先加载此页面，把你送到{school_del}官网。",
+  "about_p2": "本站与{school}并无任何官方关联。校徽取自学校官方标识，奶龙是后来自己加上去的。",
+  "credit": "非官方粉丝站点 · 与{school}无官方关联",
+  // 「关于」弹窗里那个删除线玩笑：在 about_del_after 后面插一个划掉的字
+  // 例：湖州师范大学 → 湖州<del>奶</del>师范大学；大连理工大学 → 大连<del>奶</del>理工大学
+  "about_del_after": "湖州",
+  "about_del_text": "奶",
+
+  // 备选版式里进度条依次显示的文案
+  "steps": [
+    "正在校验录取通知书…",
+    "正在给奶龙带上行李…",
+    "奶龙学长已就位，准备出发…",
+    "即将前往 {school} 官网"
+  ],
+
+  // 主题色。默认奶龙黄；想保留校徽原色就填校徽的墨色，比如 [151, 30, 35]
+  "ink_rgb": [254, 206, 14],
+
+  // 原图。换学校时替换这两个文件（名字可以不同，改这里即可）
+  "logo_file": "assets-src/huznu-logo.png",
+  // 校徽在 logo 图里的位置 [左, 上, 右, 下]；整张图就是校徽时不用改
+  "logo_emblem_box": [0, 0, 1182, 1182],
+  "nailong_file": "assets-src/nailong-src.webp",
+
+  // 徽章几何。默认值「照抄」参考站，换校徽一般不用动
+  "ring_canvas": 720,
+  "ring_outer": 355.0,
+  "ring_cut_ratio": 0.686,
+  "core_canvas": 720,
+  "core_width": 392,
+  "core_max_radius": 232.0,
+  "core_fade_from": 0.80
+}

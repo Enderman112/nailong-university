@@ -1,0 +1,27 @@
+name: Deploy to Cloudflare Pages
+
+# 需要两个仓库 secret（Settings → Secrets and variables → Actions）：
+#   CLOUDFLARE_API_TOKEN   Cloudflare Pages:Edit + Zone:Read（绑域名的话还要 DNS:Edit）
+#   CLOUDFLARE_ACCOUNT_ID
+# 上传的是仓库里已生成好的 site/；改文案/换学校要本地跑 tools/build-site.py 后一起提交。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'config.json'
+      - 'templates/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy site --project-name=nailong-university --branch=main
