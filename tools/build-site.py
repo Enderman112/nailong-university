@@ -65,6 +65,59 @@ def context(cfg):
     }
 
 
+# 本仓库自带的实例值。哪一项还是这些值、但别的项已经不是了，就说明大概率漏问了用户。
+EXAMPLE = {
+    "site_title": "中国奶龙大学",
+    "school_name_cn": "湖州师范大学",
+    "domain": "中国奶龙大学.org",
+    "target_url": "https://www.huznu.edu.cn/",
+}
+
+
+def self_check(cfg):
+    """生成前把「必须由用户拍板」的几项列出来，并检查有没有沿用示例值。
+
+    这里只警告、不报错 —— 用户如果就是想要「中国奶龙大学」这个名字，也说得通。
+    但如果域名/跳转目标已经换成了别的学校，站名却还是示例值，那几乎肯定是漏问了。
+    """
+    print("\n  将要生成的站点 —— 请逐项确认是用户要的，不是本仓库的示例：")
+    print("    （首页顶着的那个大标题 = 恶搞名；文案里说「送到 XX 官网」的 = 正式名）")
+    for label, key in (("恶搞学校名", "site_title"),
+                       ("正式学校名", "school_name_cn"),
+                       ("学校英文名", "school_name_en"),
+                       ("域名", "domain"),
+                       ("跳转目标", "target_url"),
+                       ("校训", "school_motto")):
+        v = cfg.get(key, "")
+        mark = "   ← 还是示例值" if EXAMPLE.get(key) and v == EXAMPLE[key] else ""
+        print(f"    {label:<12} {v}{mark}")
+
+    # 只要这个站点已经不是本仓库那份实例了，就检查两个名字有没有漏改
+    moved = (cfg["domain"] != EXAMPLE["domain"]
+             or cfg["target_url"] != EXAMPLE["target_url"]
+             or cfg["school_name_cn"] != EXAMPLE["school_name_cn"])
+    warn = []
+    if moved:
+        if cfg["site_title"] == EXAMPLE["site_title"]:
+            warn.append("「恶搞名」还是示例的「%s」—— 首页大标题就是它，必须问用户：\n"
+                        "      沿用「%s」，还是改成 XX 奶龙大学？" % (EXAMPLE["site_title"], EXAMPLE["site_title"]))
+        if cfg["school_name_cn"] == EXAMPLE["school_name_cn"]:
+            warn.append("「正式名」还是示例的「%s」—— 网页里「把你送到 ___ 官网」用的是它，\n"
+                        "      确认这是用户要的学校，不是上一所。" % EXAMPLE["school_name_cn"])
+        if (cfg["site_title"] == EXAMPLE["site_title"]) != (cfg["school_name_cn"] == EXAMPLE["school_name_cn"]):
+            warn.append("两个名字只改了一个 —— 会出现「哈尔滨奶龙大学」的页面写着\n"
+                        "      「把你送到湖州师范大学官网」这种混搭，回去把另一个也问一遍。")
+    else:
+        print("    （就是本仓库自带的「中国奶龙大学.org」实例，忽略下面的话）")
+
+    if warn:
+        print("\n  ⚠️  配置自检：")
+        for w in warn:
+            print("    · " + w)
+        print("    确认无误就继续；要改就改 config.json，然后重跑。")
+    print()
+
+
 def render(text, ctx):
     for k, v in ctx.items():
         text = text.replace("{{%s}}" % k, v)
@@ -95,6 +148,7 @@ def main():
     args = ap.parse_args()
     cfg = load_config(args.config)
 
+    self_check(cfg)
     if not args.no_assets:
         print("[assets]")
         build_all(cfg)
