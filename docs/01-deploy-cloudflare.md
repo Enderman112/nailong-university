@@ -1,14 +1,34 @@
 # 部署：Cloudflare Pages + 拆掉原来的 301
 
 > **这份是给 AI agent 读的执行手册**，人也可以照着做。
-> 读完这一份 + 仓库里的 `site/` 目录，就能把 `中国奶龙大学.org` 从「直接 301 去学校官网」改成
+> 读完这一份 + 仓库里的 `site/` 目录，就能把用户的域名从「直接 301 去学校官网」改成
 > 「先显示奶龙过场页，再由页面自己跳到学校官网」。
+
+> ### ⚠️ 域名和跳转目标都是**变量**，不是固定值
+>
+> 这两项**来自用户**，不要沿用本仓库实例的取值。开工前先定下来：
+>
+> | 变量 | 是什么 | 从哪来 |
+> | --- | --- | --- |
+> | `DOMAIN` | 用户的域名（中文原样写） | 问用户 |
+> | `TARGET` | 页面最后跳去的网址（学校官网） | 问用户，或 `config.json` 的 `target_url` |
+>
+> ```bash
+> export DOMAIN='用户给你的域名'            # 例：中国奶龙大学.org
+> export TARGET='https://用户学校官网/'     # 例：https://www.huznu.edu.cn/
+> # 中文域名要转 punycode，后面 curl 和 API 都用它
+> export DOMAIN_PUNY=$(python3 -c "import sys;print(sys.argv[1].encode('idna').decode())" "$DOMAIN")
+> echo "$DOMAIN_PUNY"
+> ```
+>
+> 本手册正文里出现的 `中国奶龙大学.org`、`xn--fiqs8srwb9iv6f6w9n.org`、`https://www.huznu.edu.cn`
+> 都只是**本仓库自带那份实例**的取值，用来举例；照着做时全部换成你自己的变量。
 
 | | |
 | --- | --- |
-| 目标域名 | `中国奶龙大学.org`，punycode = `xn--fiqs8srwb9iv6f6w9n.org` |
+| 目标域名 | `$DOMAIN`（**由用户提供**） |
 | 部署产物 | 仓库的 `site/` 目录（纯静态，没有构建步骤） |
-| 页面自己的跳转目标 | `https://www.huznu.edu.cn/`（在 `site/index.html` 的 `TARGET`） |
+| 页面跳转目标 | `$TARGET`（写在 `config.json` 的 `target_url`，由它生成到页面里） |
 | 需要的东西 | 一个 Cloudflare 账号 + 该域名所在的 zone + 一个 API Token（见第 2 节） |
 
 ---
@@ -16,12 +36,12 @@
 ## 0. 先确认现状（别跳这一步）
 
 ```bash
-curl -sSI "https://xn--fiqs8srwb9iv6f6w9n.org/" | sed -n '1p;/^[Ll]ocation/p'
+curl -sSI "https://$DOMAIN_PUNY/" | sed -n '1p;/^[Ll]ocation/p'
 ```
 
 | 看到什么 | 说明 | 下一步 |
 | --- | --- | --- |
-| `301` + `location: https://www.huznu.edu.cn/` | 就是本手册要处理的状态 | 继续第 1 节 |
+| `301` + `location: $TARGET` | 旧 301 还在，就是本手册要处理的状态 | 继续第 1 节 |
 | `200` 且是奶龙页面 | 301 已经拆掉了 | 跳到第 5 节 |
 | `200` 但是学校官网 | DNS 被直接指到学校了，不是 Cloudflare 重定向 | 先查 DNS（第 3.5 节） |
 | `522 / 525 / 526` | 回源或证书有问题 | 先修 DNS/证书，再回来 |
@@ -30,7 +50,7 @@ curl -sSI "https://xn--fiqs8srwb9iv6f6w9n.org/" | sed -n '1p;/^[Ll]ocation/p'
 顺手把「是不是 Cloudflare 在处理」也确认一下：
 
 ```bash
-curl -sSI "https://xn--fiqs8srwb9iv6f6w9n.org/" | grep -i '^server'
+curl -sSI "https://$DOMAIN_PUNY/" | grep -i '^server'
 ```
 
 出现 `server: cloudflare` 基本就能确定重定向是 Cloudflare 层做的（不是注册商 URL Forwarding）。
@@ -50,7 +70,7 @@ curl -sSI "https://xn--fiqs8srwb9iv6f6w9n.org/" | grep -i '^server'
 
 ```bash
 export CLOUDFLARE_API_TOKEN='...'      # 用户建，见第 2 节
-export ZONE='xn--fiqs8srwb9iv6f6w9n.org'
+export ZONE="$DOMAIN_PUNY"
 export PROJECT='nailong-university'    # Pages 项目名，随便取
 ```
 
@@ -92,13 +112,13 @@ CLOUDFLARE_API_TOKEN=... tools/cf-inspect.sh "$ZONE"
 | Zone → **DNS** → Edit | apex 绑定 Pages 时自动改 DNS 记录 | 要 Edit |
 | Account → **Mass URL Redirects** → Edit | **只有**当 301 是用「批量重定向」做的时候才需要 | 要 Edit |
 
-Scope 记得选 **Include → Specific zone → 中国奶龙大学.org**。
+Scope 记得选 **Include → Specific zone → 用户的域名**。
 
 **要凭据时的话术**（MODE A 用）：
 
 > 我要帮你把 `.org` 那条 301 换成跳转页，需要在 Cloudflare 建一个 API Token。
 > 打开 https://dash.cloudflare.com/profile/api-tokens → Create Custom Token，按上面这张表勾权限，
-> Zone Resources 选到 `中国奶龙大学.org`。建好把 token 贴给我（我只会调 Cloudflare 的 API）。
+> Zone Resources 选到用户的域名。建好把 token 贴给我（我只会调 Cloudflare 的 API）。
 > 不想给凭据也行，我一步步告诉你点哪里。
 
 ---
@@ -120,11 +140,11 @@ curl -sS "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/ht
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | jq '.result | {id, rules}'
 ```
 
-命中特征：某条 rule 的 `action` 是 `redirect`，`action_parameters.from_value.target_url.value` 是 `https://www.huznu.edu.cn/`，
+命中特征：某条 rule 的 `action` 是 `redirect`，`action_parameters.from_value.target_url.value` 就是 `$TARGET`，
 `status_code` 是 `301`。
 
-> **控制台操作**：Cloudflare 控制台 → 选 `中国奶龙大学.org` → 左侧 **规则 → 重定向规则**。
-> 应该能看到一条「目标 URL = https://www.huznu.edu.cn/」的规则。
+> **控制台操作**：Cloudflare 控制台 → 选用户的域名 → 左侧 **规则 → 重定向规则**。
+> 应该能看到一条「目标 URL = $TARGET」的规则。
 
 **先把现状存下来再动手**（回滚要用）：
 
@@ -205,7 +225,7 @@ curl -sS "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?per_pa
 `@` 上如果是 `A` 指向 Cloudflare 的 anycast IP（`104.x` / `172.67.x`）并且 `proxied=true`，说明流量是 Cloudflare 接的，
 内容由后面的规则决定 —— 这正是要拆 301 而不是改 DNS 的情况。
 
-> 如果 `@` 是一条 `CNAME` 指向 `www.huznu.edu.cn`，那是真·DNS 跳转，把这行备份后删掉即可。
+> 如果 `@` 是一条 `CNAME` 指向学校官网，那是真·DNS 跳转，把这行备份后删掉即可。
 
 ---
 
@@ -328,17 +348,17 @@ python3 tools/build-site.py
 
 ## 5. 把域名绑到 Pages
 
-**中文域名一定要填 punycode：`xn--fiqs8srwb9iv6f6w9n.org`。**
+**中文域名一定要填 punycode** —— 就是开头那个 `$DOMAIN_PUNY`，命令行里直接用变量。
 
 ```bash
 curl -sS -X POST \
   "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/pages/projects/$PROJECT/domains" \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
-  --data '{"name":"xn--fiqs8srwb9iv6f6w9n.org"}' | jq '.success, .result.name, .errors'
+  --data "{\"name\":\"$DOMAIN_PUNY\"}" | jq '.success, .result.name, .errors'
 ```
 
-> **控制台操作**：Pages 项目 → **Custom domains → Set up a domain** → 填 `xn--fiqs8srwb9iv6f6w9n.org`。
-> 控制台里会显示成 `中国奶龙大学.org`，这是正常的。
+> **控制台操作**：Pages 项目 → **Custom domains → Set up a domain** → 填 `$DOMAIN_PUNY`。
+> 控制台会把它显示成中文，这是正常的。
 
 **报「记录已存在 / DNS record already exists」时**：`@` 上还留着旧的 A/AAAA 记录。
 先备份（第 3.5 节已经存了 `/tmp/dns-backup.txt`），删掉冲突的那条，再重试绑定。
@@ -355,25 +375,25 @@ curl -sS -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_reco
 ## 6. 验收（必须全过）
 
 ```bash
-DOMAIN='xn--fiqs8srwb9iv6f6w9n.org'
+# 域名用开头定义的 $DOMAIN_PUNY，跳转目标用 $TARGET
 
 # 1) 不再是 301
-curl -sSI "https://$DOMAIN/" | sed -n '1p'            # 期望 HTTP/2 200
+curl -sSI "https://$DOMAIN_PUNY/" | sed -n '1p'         # 期望 HTTP/2 200
 
 # 2) 返回的确实是我们的页面
-curl -sS "https://$DOMAIN/" | grep -c '中国奶龙大学'   # 期望 >= 1
+curl -sS "https://$DOMAIN_PUNY/" | grep -c '中国奶龙大学'  # 期望 >= 1（关键词换成页面上那句大标题）
 
 # 3) 页面里写死的跳转目标仍然是学校官网
-curl -sS "https://$DOMAIN/" | grep -o 'www\.huznu\.edu\.cn' | head -1
+curl -sS "https://$DOMAIN_PUNY/" | grep -o "$(echo "$TARGET" | sed -E 's#^https?://##; s#/$##')" | head -1
 
 # 4) 静态资源都在（不能 404）
 for f in ring.webp core.webp favicon.png og.jpg; do
   printf '%s -> ' "$f"
-  curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/$f"
+  curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN_PUNY/$f"
 done
 
 # 5) 真浏览器：渲染 + 2.6 秒后真的跳到学校官网 + 无 console 报错
-node tools/check-site.mjs "https://$DOMAIN/"
+node tools/check-site.mjs "https://$DOMAIN_PUNY/" --expect "$TARGET"
 ```
 
 第 5 步需要 playwright：
@@ -397,7 +417,8 @@ curl -sS -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/ph
   --data @/tmp/redirect-restore.json | jq '.success'
 ```
 
-万一备份丢了，一条等价的 301 长这样：
+万一备份丢了，一条等价的 301 长这样（把 `<TARGET>` 换成用户要跳的网址，
+本仓库实例是 `https://www.huznu.edu.cn/`）：
 
 ```json
 {
@@ -408,7 +429,7 @@ curl -sS -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/ph
     "action_parameters": {
       "from_value": {
         "status_code": 301,
-        "target_url": { "value": "https://www.huznu.edu.cn/" },
+        "target_url": { "value": "<TARGET>" },
         "preserve_query_string": false
       }
     }
@@ -422,14 +443,14 @@ curl -sS -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/ph
 
 | 症状 | 原因 | 处理 |
 | --- | --- | --- |
-| 控制台里找不到这个域名 | 中文域名在列表里显示为中文 | 搜 `xn--fiqs8srwb9iv6f6w9n` 或直接翻列表 |
+| 控制台里找不到这个域名 | 中文域名在列表里显示为中文 | 搜 `$DOMAIN_PUNY` 的前几个字符，或直接翻列表 |
 | 拆了 301 浏览器还是秒跳 | ① 还有别的重定向没拆 ② 浏览器缓存了 301 | 回到第 3 节逐项排查；用无痕/`curl` 复验 |
 | zone 里翻遍了都没有 | 301 是 **Bulk Redirect（账号级）** 或 Worker 做的 | 第 3.2 / 3.4 节 |
 | 绑域名报 DNS 记录冲突 | `@` 上有旧 A/AAAA | 备份后删掉再绑（第 5 节） |
 | 页面出来了但样式/图片全 404 | 产物放进了子目录，或只传了 `site/*.html` | 必须把 `site/` **里的内容**传到站点根目录 |
-| 分享卡片没图 | `og:image` 是写死的绝对地址 | 改 `site/index.html` 里那行 `og:image` |
+| 分享卡片没图 | `og:image` 是绝对地址，由域名生成 | 改 `config.json` 的 `domain` 后重新生成 |
 | wrangler 报 `Authentication error` | 没给 `CLOUDFLARE_ACCOUNT_ID` | 补上环境变量 |
-| 想只改跳转目标 | 不用碰 Cloudflare | 改 `site/index.html` 的 `TARGET` 后重新部署 |
+| 想只改跳转目标 | 不用碰 Cloudflare | 改 `config.json` 的 `target_url`，跑 `tools/build-site.py --no-assets` 后重新部署 |
 
 ---
 
