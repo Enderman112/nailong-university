@@ -88,12 +88,19 @@ await render('index', base + 'index.html?stay');
 await render('index-mobile', base + 'index.html?stay', { width: 390, height: 844, wait: 2600 });
 await render('index-mobile-dialog', base + 'index.html?stay', { width: 390, height: 844, wait: 1200 });
 await render('index-dark', base + 'index.html?stay', { dark: true });
-// 2) 备选版式
-await render('mascot', base + 'mascot.html', { wait: 2200 });
+// 2) 备选版式（首页版式可选，另一个页面的文件名可能是 mascot.html 或 rotate.html）
+const altCandidates = ['mascot.html', 'rotate.html'];
+let alt = null;
+for (const c of altCandidates) {
+  const r = await fetch(base + c, { method: 'HEAD' }).catch(() => null);
+  if (r && r.ok) { alt = c; break; }
+}
+if (alt) await render(alt.replace(/\.html$/, ''), base + alt, { wait: 2200 });
+else bad(`备选页面找不到（试过 ${altCandidates.join(' / ')}）`);
 
 // 3) 真的会跳吗
 console.log('\n[redirect] 不带 ?stay，等它自己走');
-for (const file of ['index.html', 'mascot.html']) {
+for (const file of ['index.html', ...(alt ? [alt] : [])]) {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 760 } });
   const page = await ctx.newPage();
   await page.goto(base + file, { waitUntil: 'load' });
