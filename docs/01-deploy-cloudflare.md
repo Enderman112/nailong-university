@@ -213,6 +213,21 @@ curl -sS "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?per_pa
 
 产物就在 `site/`，**不要上传 `tools/` `docs/` `assets-src/`**。
 
+> ### 关于「首页文件」：不用指定，`index.html` 是默认约定
+>
+> Pages **没有**「哪个文件当首页」这个设置项。只要 `index.html` 落在**输出根目录**，
+> 访问 `/` 就自动返回它。
+>
+> 所以要盯的不是首页文件名，而是**目录层级别多套一层**：
+>
+> | | 结果 |
+> | --- | --- |
+> | ✅ 对 | `https://<项目>.pages.dev/` 直接出奶龙页面，`/ring.webp` 也是 200 |
+> | ❌ 多套一层 | `/` 返回 404，或者你得访问 `https://<项目>.pages.dev/site/` 才看得到 |
+>
+> 后者说明你把 `site` 这个**文件夹本身**当成了要传的东西，而不是「`site` 里的内容」。
+> 页面里引用的是 `/ring.webp` 这种**绝对路径**，一旦多套一层，图和样式会全部 404。
+
 ### MODE B：命令行（推荐）
 
 ```bash
@@ -226,13 +241,52 @@ npx wrangler@latest pages deploy site \
   --project-name="$PROJECT" --branch=main --commit-dirty=true
 ```
 
-wrangler 认 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个环境变量，不用 `wrangler login`。
-输出里会给一个 `https://<hash>.<project>.pages.dev` 预览地址，**先打开它确认页面正常**。
+`wrangler pages deploy site` 上传的是 **`site` 目录里的内容**，`index.html` 会直接落在根，
+这正是我们要的。wrangler 认 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个环境变量，
+不用 `wrangler login`。输出里会给一个 `https://<hash>.<project>.pages.dev` 预览地址，
+**先打开它确认页面正常**。
 
 ### MODE A：控制台拖拽
 
 > Cloudflare 控制台 → **Workers & Pages** → **Create** → **Pages** → **Upload assets** →
-> 项目名随意 → 把仓库里的 **`site` 文件夹整个拖进去** → **Deploy site**。
+> 项目名随意 → 把仓库里的 **`site` 文件夹拖进去** → **Deploy site**。
+
+拖完如果 `/` 是 404，就说明被套了一层：回去改成拖 **`site` 文件夹里面的那些文件**
+（`index.html`、`ring.webp`…），别拖文件夹本身。
+
+### 如果用 Git 集成（从仓库自动构建）
+
+| 设置项 | 填什么 |
+| --- | --- |
+| Framework preset | `None` |
+| Build command | **留空**（这个项目没有构建步骤） |
+| Build output directory | `site` |
+
+不要图省事把 Build command 写成 `cd site` 之类 —— 没有构建步骤，只填输出目录就够了。
+仓库里的 `.github/workflows/deploy-pages.yml` 走的是 wrangler 直传，不走这条路径。
+
+### 部署完先自检目录层级
+
+```bash
+P=https://<项目>.pages.dev
+
+curl -sSI "$P/" | head -1                                   # 期望 HTTP/2 200
+curl -sS  "$P/" | grep -c '中国奶龙大学'                     # 期望 >= 1
+curl -sS -o /dev/null -w '%{http_code}\n' "$P/ring.webp"    # 期望 200，不是 404
+```
+
+三条都过，说明层级没问题，可以继续绑域名了。
+
+### 备选版式放在哪
+
+`mascot.html` 部署后在 `https://<域名>/mascot.html`，主页面 `index.html` 在 `/`。
+**想反过来让备选版式当首页**，就在 `site/` 里把两个文件对调：
+
+```bash
+cd site && mv index.html home-rotate.html && mv mascot.html index.html
+```
+
+（更好的做法是改 `tools/build-site.py` 里的输出映射，免得下次生成又被覆盖。）
 
 ### 没有 Pages 的替代方案
 
