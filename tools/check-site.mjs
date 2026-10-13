@@ -48,9 +48,16 @@ async function render(name, url, { width = 900, height = 760, dark = false, wait
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, colorScheme: dark ? 'dark' : 'light' });
   const page = await ctx.newPage();
   const errors = [];
-  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  page.on('requestfailed', r => errors.push('requestfailed: ' + r.url()));
+  // 页面到点会自己跳到学校官网；跳走之后的报错是对方站点的，不能算我们头上。
+  // 用 framenavigated 盯着「还在不在我们这」，离开就把耳朵闭上。
+  let onOurSite = true;
+  const ourOrigin = new URL(base).origin;
+  page.on('framenavigated', f => {
+    if (f === page.mainFrame()) onOurSite = f.url().startsWith(ourOrigin);
+  });
+  page.on('pageerror', e => { if (onOurSite) errors.push('pageerror: ' + e.message); });
+  page.on('console', m => { if (onOurSite && m.type() === 'error') errors.push('console: ' + m.text()); });
+  page.on('requestfailed', r => { if (onOurSite) errors.push('requestfailed: ' + r.url()); });
 
   const resp = await page.goto(url, { waitUntil: 'load' });
   if (!resp || resp.status() !== 200) bad(`HTTP ${resp && resp.status()}（期望 200，若为 301 说明旧的跳转还没拆）`);
@@ -88,12 +95,32 @@ await render('index', base + 'index.html?stay');
 await render('index-mobile', base + 'index.html?stay', { width: 390, height: 844, wait: 2600 });
 await render('index-mobile-dialog', base + 'index.html?stay', { width: 390, height: 844, wait: 1200 });
 await render('index-dark', base + 'index.html?stay', { dark: true });
-// 2) 备选版式
-await render('mascot', base + 'mascot.html', { wait: 2200 });
+// 2) 备选版式。首页版式可切换（见 config.json 的 homepage），另一个页面叫
+//    mascot.html 或 rotate.html。**不能用 HTTP 状态码判断它存不存在**：
+//    Cloudflare Pages 对任意未知路径都会回 index.html + 200，
+//    所以只能比对内容 —— 和 index.html 一模一样的，就是 fallback，不是真页面。
+async function findAlt() {
+  const idx = await fetch(base + 'index.html').then(r => r.ok ? r.text() : '').catch(() => '');
+  const tried = [];
+  for (const c of ['mascot.html', 'rotate.html']) {
+    const r = await fetch(base + c).catch(() => null);
+    if (!r || !r.ok) { tried.push(`${c}(HTTP ${r ? r.status : '连不上'})`); continue; }
+    const body = await r.text();
+    if (body.trim() === idx.trim()) { tried.push(`${c}(返回的是 index 的 fallback)`); continue; }
+    console.log(`\n[备选版式] ${c} ✓` + (tried.length ? `   已排除：${tried.join('、')}` : ''));
+    return c;
+  }
+  console.log(`\n[备选版式] 没找到真页面，试过：${tried.join('、')}`);
+  return null;
+}
+
+const alt = await findAlt();
+if (alt) await render(alt.replace(/\.html$/, ''), base + alt, { wait: 2200 });
+else bad('备选页面找不到（mascot.html / rotate.html 都只是 index 的 fallback）');
 
 // 3) 真的会跳吗
 console.log('\n[redirect] 不带 ?stay，等它自己走');
-for (const file of ['index.html', 'mascot.html']) {
+for (const file of ['index.html', ...(alt ? [alt] : [])]) {
   const ctx = await browser.newContext({ viewport: { width: 900, height: 760 } });
   const page = await ctx.newPage();
   await page.goto(base + file, { waitUntil: 'load' });

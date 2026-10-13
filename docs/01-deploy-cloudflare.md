@@ -277,6 +277,26 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$P/ring.webp"    # 期望 200，不�
 
 三条都过，说明层级没问题，可以继续绑域名了。
 
+### 注意：Pages 对**未知路径**会回 `index.html` 且给 200
+
+所以**不能用「curl 一下不是 404」来判断某个文件存不存在**。实测（本项目线上）：
+
+| 请求 | 结果 |
+| --- | --- |
+| `/` | 200（index.html） |
+| `/index.html` | 308 → `/` |
+| `/rotate` | 200 |
+| `/rotate.html` | 308 → `/rotate` |
+| `/mascot.html`（该版式没生成时） | **200，返回的其实是 index.html** |
+| `/随便什么` | **200，返回的其实是 index.html** |
+
+这正好解释了参考站 HTML 里那句注释「任意路径都会返回本页，相对路径会在 `/a/b` 下失效」
+—— 参考站也跑在 Pages 上。
+
+要确认一个文件**真的**存在，只能比对内容，不能看状态码。
+`tools/check-site.mjs` 的 `findAlt()` 就是这么做的：拉下来跟 index.html 比，
+一模一样就判定为 fallback 而不是真页面。
+
 ### 两套版式谁当首页：改配置，别手动改名
 
 | `config.json` 的 `homepage` | `/` 显示 | 另一个在 |
