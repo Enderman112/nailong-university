@@ -8,7 +8,7 @@
   // 用哪套版式当首页（都叫 index.html，另一个会放在自己的名字下）
   //   "index"  = 旋转校徽环 + 倒计时（仿 中国奶龙大学.com）  → 另一个是 /mascot.html
   //   "mascot" = 校徽旁边一只奶龙 + 进度条（仿 哈尔滨奶龙大学.com）→ 另一个是 /rotate.html
-  "homepage": "mascot",
+  "homepage": "index",
 
   // 这是哪个「奶龙大学」——显示在页面大标题和浏览器标签上
   "site_title": "中国奶龙大学",
